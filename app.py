@@ -1,4 +1,5 @@
 import random
+import heapq
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
@@ -110,16 +111,169 @@ def aplicar_interval_scheduling(clientes):
     return agenda, clientes_fora
 
 
+def criar_produto(nome, peso_texto, valor_texto):
+    """Valida os dados digitados e cria o dicionario de um produto."""
+    nome = nome.strip()
+
+    if nome == "":
+        raise ValueError("O nome do produto nao pode ficar vazio.")
+
+    try:
+        peso_kg = float(peso_texto.replace(",", ".").strip())
+    except ValueError as erro:
+        raise ValueError("O peso deve ser um numero (ex: 1.25).") from erro
+
+    try:
+        valor = float(valor_texto.replace(",", ".").strip())
+    except ValueError as erro:
+        raise ValueError("O valor deve ser um numero (ex: 49.90).") from erro
+
+    if peso_kg <= 0:
+        raise ValueError("O peso deve ser maior que zero.")
+
+    if valor < 0:
+        raise ValueError("O valor nao pode ser negativo.")
+
+    peso_g = int(round(peso_kg * 1000))
+    if peso_g <= 0:
+        raise ValueError("O peso deve ser maior que zero.")
+
+    return {"nome": nome, "peso_g": peso_g, "valor": valor}
+
+
+def gerar_produtos_aleatorios(quantidade):
+    """Gera produtos cosmeticos ficticios com peso e valor aleatorios."""
+    bases = [
+        "Creme Hidratante",
+        "Shampoo",
+        "Condicionador",
+        "Perfume",
+        "Sabonete Liquido",
+        "Protetor Solar",
+        "Batom",
+        "Base Facial",
+        "Mascara de Cilios",
+        "Delineador",
+        "Tonalizante",
+        "Locao Corporal",
+    ]
+
+    produtos = []
+    for numero in range(1, quantidade + 1):
+        nome = f"{random.choice(bases)} {numero:02d}"
+        peso_kg = round(random.uniform(0.10, 2.00), 2)
+        valor = round(random.uniform(10.0, 500.0), 2)
+        produtos.append(
+            {
+                "nome": nome,
+                "peso_g": int(round(peso_kg * 1000)),
+                "valor": valor,
+            }
+        )
+
+    return produtos
+
+
+def aplicar_knapsack(produtos, capacidade_kg):
+    """
+    Resolve o problema Fractional Knapsack usando algoritmo guloso com heap.
+
+    Os produtos sao priorizados pela maior razao valor/peso.
+    Como os itens sao divisiveis, o algoritmo pode selecionar apenas
+    uma fracao do ultimo produto para completar a capacidade.
+
+    Retorna: (produtos_escolhidos, produtos_fora, valor_maximo)
+    """
+    try:
+        capacidade = float(str(capacidade_kg).replace(",", ".").strip())
+    except ValueError as erro:
+        raise ValueError("A capacidade deve ser um numero (ex: 5).") from erro
+
+    if capacidade <= 0:
+        raise ValueError("A capacidade deve ser maior que zero.")
+
+    capacidade_g = int(round(capacidade * 1000))
+    if capacidade_g <= 0:
+        raise ValueError("A capacidade deve ser maior que zero.")
+
+    heap = []
+
+    for produto in produtos:
+        peso = produto["peso_g"]
+        valor = float(produto["valor"])
+
+        if peso <= 0:
+            continue
+
+        razao = valor / peso
+
+        heapq.heappush(
+            heap,
+            (
+                -razao,
+                produto,
+            ),
+        )
+
+    capacidade_restante = capacidade_g
+    valor_total = 0.0
+    produtos_escolhidos = []
+    produtos_fora = []
+
+    while heap and capacidade_restante > 0:
+        _, produto = heapq.heappop(heap)
+
+        peso = produto["peso_g"]
+        valor = float(produto["valor"])
+
+        if peso <= capacidade_restante:
+            produtos_escolhidos.append(
+                {
+                    "nome": produto["nome"],
+                    "peso_g": peso,
+                    "valor": valor,
+                    "fracao": 1.0,
+                }
+            )
+
+            capacidade_restante -= peso
+            valor_total += valor
+        else:
+            fracao = capacidade_restante / peso
+            peso_utilizado = int(round(peso * fracao))
+            valor_utilizado = valor * fracao
+
+            produtos_escolhidos.append(
+                {
+                    "nome": produto["nome"],
+                    "peso_g": peso_utilizado,
+                    "valor": valor_utilizado,
+                    "fracao": fracao,
+                }
+            )
+
+            valor_total += valor_utilizado
+            capacidade_restante = 0
+
+    nomes_escolhidos = set(produto["nome"] for produto in produtos_escolhidos)
+
+    for produto in produtos:
+        if produto["nome"] not in nomes_escolhidos:
+            produtos_fora.append(produto)
+
+    return produtos_escolhidos, produtos_fora, valor_total
+
+
+def formatar_peso_kg(peso_g):
+    return f"{peso_g / 1000:.2f} kg"
+
+
 class AplicacaoAgenda:
     """Interface grafica simples para cadastrar clientes e calcular a agenda."""
 
-    def __init__(self, janela):
-        self.janela = janela
+    def __init__(self, container):
+        self.container = container
         self.clientes = []
-
-        self.janela.title("Agenda de Visitas - Interval Scheduling")
-        self.janela.geometry("900x620")
-        self.janela.minsize(760, 520)
 
         self.configurar_estilo()
         self.criar_interface()
@@ -135,7 +289,7 @@ class AplicacaoAgenda:
         estilo.configure("Treeview.Heading", font=("Arial", 10, "bold"))
 
     def criar_interface(self):
-        quadro_principal = ttk.Frame(self.janela, padding=16)
+        quadro_principal = ttk.Frame(self.container, padding=16)
         quadro_principal.pack(fill="both", expand=True)
 
         titulo = ttk.Label(
@@ -174,7 +328,9 @@ class AplicacaoAgenda:
         ttk.Button(quadro_botoes, text="Gerar clientes", command=self.gerar_clientes).pack(side="left", padx=4)
         ttk.Button(quadro_botoes, text="Limpar campos", command=self.limpar_campos).pack(side="left", padx=4)
         ttk.Button(quadro_botoes, text="Calcular melhor agenda", command=self.calcular_agenda).pack(side="left", padx=4)
-        ttk.Button(quadro_botoes, text="Sair", command=self.janela.destroy).pack(side="left", padx=4)
+        ttk.Button(quadro_botoes, text="Sair", command=self.container.winfo_toplevel().destroy).pack(
+            side="left", padx=4
+        )
 
         ttk.Label(quadro_principal, text="Clientes cadastrados", style="Subtitulo.TLabel").pack(anchor="w", pady=(8, 4))
 
@@ -298,9 +454,214 @@ class AplicacaoAgenda:
         self.texto_resultado.configure(state="disabled")
 
 
+class AplicacaoKnapsack:
+    """Interface grafica para cadastrar produtos e calcular o Knapsack."""
+
+    def __init__(self, container):
+        self.container = container
+        self.produtos = []
+
+        self.configurar_estilo()
+        self.criar_interface()
+
+    def configurar_estilo(self):
+        estilo = ttk.Style()
+        estilo.theme_use("clam")
+        estilo.configure("TFrame", background="#f5f5f5")
+        estilo.configure("Titulo.TLabel", background="#f5f5f5", font=("Arial", 16, "bold"))
+        estilo.configure("Subtitulo.TLabel", background="#f5f5f5", font=("Arial", 11, "bold"))
+        estilo.configure("TLabel", background="#f5f5f5", font=("Arial", 10))
+        estilo.configure("TButton", font=("Arial", 10), padding=6)
+        estilo.configure("Treeview.Heading", font=("Arial", 10, "bold"))
+
+    def criar_interface(self):
+        quadro_principal = ttk.Frame(self.container, padding=16)
+        quadro_principal.pack(fill="both", expand=True)
+
+        titulo = ttk.Label(
+            quadro_principal,
+            text="Mochila do Vendedor - Fractional Knapsack (Greedy + Heap)",
+            style="Titulo.TLabel",
+        )
+        titulo.pack(anchor="w")
+
+        quadro_formulario = ttk.LabelFrame(quadro_principal, text="Cadastrar produto", padding=12)
+        quadro_formulario.pack(fill="x", pady=(14, 10))
+
+        quadro_formulario.columnconfigure(1, weight=1)
+        quadro_formulario.columnconfigure(3, weight=1)
+
+        ttk.Label(quadro_formulario, text="Produto:").grid(row=0, column=0, sticky="w", padx=(0, 6), pady=4)
+        self.entrada_produto = ttk.Entry(quadro_formulario)
+        self.entrada_produto.grid(row=0, column=1, sticky="ew", padx=(0, 12), pady=4)
+
+        ttk.Label(quadro_formulario, text="Peso (kg):").grid(row=0, column=2, sticky="w", padx=(0, 6), pady=4)
+        self.entrada_peso = ttk.Entry(quadro_formulario, width=12)
+        self.entrada_peso.grid(row=0, column=3, sticky="w", pady=4)
+
+        ttk.Label(quadro_formulario, text="Valor (R$):").grid(row=1, column=0, sticky="w", padx=(0, 6), pady=4)
+        self.entrada_valor = ttk.Entry(quadro_formulario, width=12)
+        self.entrada_valor.grid(row=1, column=1, sticky="w", padx=(0, 12), pady=4)
+
+        ttk.Label(quadro_formulario, text="Capacidade (kg):").grid(row=1, column=2, sticky="w", padx=(0, 6), pady=4)
+        self.entrada_capacidade = ttk.Entry(quadro_formulario, width=12)
+        self.entrada_capacidade.grid(row=1, column=3, sticky="w", pady=4)
+        self.entrada_capacidade.insert(0, "5")
+
+        quadro_botoes = ttk.Frame(quadro_formulario)
+        quadro_botoes.grid(row=2, column=0, columnspan=4, sticky="e", pady=(8, 0))
+
+        ttk.Button(quadro_botoes, text="Cadastrar produto", command=self.cadastrar_produto).pack(side="left", padx=4)
+        ttk.Button(quadro_botoes, text="Gerar produtos", command=self.gerar_produtos).pack(side="left", padx=4)
+        ttk.Button(quadro_botoes, text="Limpar campos", command=self.limpar_campos).pack(side="left", padx=4)
+        ttk.Button(quadro_botoes, text="Calcular melhor mochila", command=self.calcular_mochila).pack(side="left", padx=4)
+        ttk.Button(quadro_botoes, text="Limpar lista", command=self.limpar_lista).pack(side="left", padx=4)
+
+        ttk.Label(quadro_principal, text="Produtos cadastrados", style="Subtitulo.TLabel").pack(anchor="w", pady=(8, 4))
+
+        colunas_produtos = ("nome", "peso", "valor")
+        self.tabela_produtos = ttk.Treeview(
+            quadro_principal,
+            columns=colunas_produtos,
+            show="headings",
+            height=8,
+        )
+        self.tabela_produtos.heading("nome", text="Produto")
+        self.tabela_produtos.heading("peso", text="Peso")
+        self.tabela_produtos.heading("valor", text="Valor (R$)")
+        self.tabela_produtos.column("nome", width=260)
+        self.tabela_produtos.column("peso", width=90, anchor="center")
+        self.tabela_produtos.column("valor", width=110, anchor="e")
+        self.tabela_produtos.pack(fill="both", expand=True)
+
+        ttk.Label(quadro_principal, text="Resultado", style="Subtitulo.TLabel").pack(anchor="w", pady=(12, 4))
+
+        self.texto_resultado = tk.Text(
+            quadro_principal,
+            height=10,
+            wrap="word",
+            font=("Consolas", 10),
+            bg="#ffffff",
+            fg="#111111",
+        )
+        self.texto_resultado.pack(fill="both", expand=True)
+        self.texto_resultado.insert("1.0", "Cadastre produtos e clique em 'Calcular melhor mochila'.")
+        self.texto_resultado.configure(state="disabled")
+
+    def cadastrar_produto(self):
+        try:
+            produto = criar_produto(
+                self.entrada_produto.get(),
+                self.entrada_peso.get(),
+                self.entrada_valor.get(),
+            )
+        except ValueError as erro:
+            messagebox.showerror("Erro no cadastro", str(erro))
+            return
+
+        self.produtos.append(produto)
+        self.atualizar_tabela_produtos()
+        self.limpar_campos()
+        messagebox.showinfo("Cadastro", "Produto cadastrado com sucesso.")
+
+    def gerar_produtos(self):
+        novos_produtos = gerar_produtos_aleatorios(30)
+        self.produtos.extend(novos_produtos)
+        self.atualizar_tabela_produtos()
+        self.mostrar_resultado("Foram gerados 30 produtos cosmeticos com peso e valor aleatorios.")
+        messagebox.showinfo("Gerar produtos", "30 produtos foram gerados com sucesso.")
+
+    def limpar_campos(self):
+        self.entrada_produto.delete(0, tk.END)
+        self.entrada_peso.delete(0, tk.END)
+        self.entrada_valor.delete(0, tk.END)
+        self.entrada_produto.focus()
+
+    def limpar_lista(self):
+        self.produtos = []
+        self.atualizar_tabela_produtos()
+        self.mostrar_resultado("Lista de produtos limpa.")
+
+    def atualizar_tabela_produtos(self):
+        for item in self.tabela_produtos.get_children():
+            self.tabela_produtos.delete(item)
+
+        for produto in self.produtos:
+            self.tabela_produtos.insert(
+                "",
+                tk.END,
+                values=(
+                    produto["nome"],
+                    formatar_peso_kg(produto["peso_g"]),
+                    f"{produto['valor']:.2f}",
+                ),
+            )
+
+    def calcular_mochila(self):
+        if len(self.produtos) == 0:
+            messagebox.showwarning("Mochila", "Cadastre pelo menos um produto.")
+            return
+
+        try:
+            escolhidos, fora, valor_maximo = aplicar_knapsack(self.produtos, self.entrada_capacidade.get())
+        except ValueError as erro:
+            messagebox.showerror("Erro", str(erro))
+            return
+
+        peso_total_g = sum(produto["peso_g"] for produto in escolhidos)
+        linhas = []
+        linhas.append("MELHOR COMBINACAO DE PRODUTOS (FRACTIONAL KNAPSACK)")
+        linhas.append("")
+        linhas.append(f"Capacidade: {self.entrada_capacidade.get().strip()} kg")
+        linhas.append(f"Peso total selecionado: {formatar_peso_kg(peso_total_g)}")
+        linhas.append(f"Valor maximo: R$ {valor_maximo:.2f}")
+        linhas.append("")
+
+        if len(escolhidos) > 0:
+            linhas.append("PRODUTOS SELECIONADOS")
+            for indice, produto in enumerate(sorted(escolhidos, key=lambda p: p["valor"], reverse=True), start=1):
+                percentual = produto["fracao"] * 100
+
+                linhas.append(
+                    f"{indice}. {produto['nome']} | {formatar_peso_kg(produto['peso_g'])} | "
+                    f"R$ {produto['valor']:.2f} | {percentual:.1f}% do produto"
+                )
+        else:
+            linhas.append("Nenhum produto foi selecionado dentro da capacidade.")
+
+        linhas.append("")
+        if len(fora) > 0:
+            linhas.append("PRODUTOS QUE FICARAM DE FORA")
+            for produto in sorted(fora, key=lambda p: p["peso_g"], reverse=True):
+                linhas.append(f"- {produto['nome']} | {formatar_peso_kg(produto['peso_g'])} | R$ {produto['valor']:.2f}")
+        else:
+            linhas.append("Nenhum produto ficou de fora.")
+
+        self.mostrar_resultado("\n".join(linhas))
+
+    def mostrar_resultado(self, texto):
+        self.texto_resultado.configure(state="normal")
+        self.texto_resultado.delete("1.0", tk.END)
+        self.texto_resultado.insert("1.0", texto)
+        self.texto_resultado.configure(state="disabled")
+
+
 def executar_aplicacao():
     janela = tk.Tk()
-    AplicacaoAgenda(janela)
+    janela.title("Greedy & DP - Interval Scheduling + Knapsack")
+    janela.geometry("980x680")
+    janela.minsize(820, 560)
+
+    notebook = ttk.Notebook(janela)
+    notebook.pack(fill="both", expand=True)
+
+    aba_agenda = ttk.Frame(notebook)
+    aba_mochila = ttk.Frame(notebook)
+    notebook.add(aba_agenda, text="Agenda (Interval Scheduling)")
+    notebook.add(aba_mochila, text="Mochila (Knapsack)")
+
+    AplicacaoAgenda(aba_agenda)
+    AplicacaoKnapsack(aba_mochila)
     janela.mainloop()
 
 

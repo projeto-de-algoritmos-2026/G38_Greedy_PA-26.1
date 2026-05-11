@@ -1,11 +1,14 @@
 # G38_Greedy_PA-26.1
 
-Aplicacao em Python puro com interface grafica simples para cadastrar clientes e calcular a melhor agenda de visitas usando o algoritmo guloso de **Interval Scheduling**.
+Aplicacao em Python puro com interface grafica simples com duas funcionalidades:
+
+1. Cadastrar clientes e calcular a melhor agenda de visitas usando o algoritmo ganancioso de **Interval Scheduling**.
+2. Cadastrar produtos e calcular a melhor combinacao de itens para a mochila do vendedor usando **Knapsack**.
 
 ## Como executar
 
 ```bash
-python app.py
+python3 app.py
 ```
 
 ## Interface
@@ -18,6 +21,9 @@ A janela da aplicacao permite:
 4. Calcular a melhor agenda de visitas.
 5. Ver a quantidade maxima de visitas possiveis.
 6. Ver os clientes que ficaram de fora da agenda.
+7. Cadastrar produtos com peso (kg) e valor (R$).
+8. Gerar automaticamente uma lista de produtos cosmeticos aleatorios.
+9. Informar a capacidade maxima (kg) e calcular o maior valor possivel dentro do limite de massa usando um algoritmo ganancioso baseado na razao valor/peso.
 
 ## Exemplo de uso
 
@@ -53,3 +59,39 @@ Clientes que ficaram de fora:
 O algoritmo de Interval Scheduling ordena todos os clientes pelo menor horario de termino. Em seguida, escolhe o primeiro cliente que termina mais cedo e continua escolhendo apenas clientes cujo horario de inicio seja maior ou igual ao horario de fim do ultimo cliente escolhido.
 
 Essa estrategia gulosa funciona para o problema classico de maximizar a quantidade de intervalos nao sobrepostos porque deixar a agenda livre o mais cedo possivel aumenta as chances de encaixar mais visitas depois.
+
+## Knapsack
+
+A segunda funcionalidade da aplicacao resolve o problema da mochila do vendedor utilizando o algoritmo ganancioso de **Knapsack**.
+
+Cada produto possui:
+
+- nome
+- peso
+- valor
+
+O algoritmo calcula a razao entre valor e peso:
+
+```text
+valor / peso
+```
+
+Os produtos sao inseridos em um **heap de prioridade maxima** e o algoritmo sempre escolhe primeiro o produto com maior retorno por unidade de peso.
+
+No escopo deste proejto os itens sao divisiveis. Isso significa que o algoritmo pode selecionar apenas uma fracao do ultimo produto para preencher completamente a mochila.
+
+Exemplo:
+
+| Produto | Peso | Valor | Valor/Peso |
+| --- | --- | --- | --- |
+| Perfume Premium | 1 kg | R$ 200 | 200 |
+| Creme Facial | 2 kg | R$ 240 | 120 |
+| Shampoo | 1 kg | R$ 80 | 80 |
+
+Se a mochila possuir capacidade de apenas 1.5 kg:
+
+1. O algoritmo escolhe primeiro o Perfume Premium.
+2. Ainda restam 0.5 kg livres.
+3. O algoritmo pega apenas 25% do Creme Facial.
+
+Essa estrategia gananciosa produz a solucao otima para o problema Knapsack.
