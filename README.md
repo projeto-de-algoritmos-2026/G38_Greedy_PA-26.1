@@ -8,7 +8,7 @@ Aplicacao em Python puro com interface grafica simples com duas funcionalidades:
 ## Como executar
 
 ```bash
-python3 app.py
+python3 app.py (Mac) ou python app.py
 ```
 
 ## Interface
