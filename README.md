@@ -11,6 +11,10 @@ Aplicacao em Python puro com interface grafica simples com duas funcionalidades:
 python3 app.py (Mac) ou python app.py
 ```
 
+## Video da entrega
+
+[Acessar video da entrega](https://drive.google.com/file/d/1XBiNg-ipWnzcgI0N0B68DxT8fu6CT_xz/view?usp=sharing)
+
 ## Interface
 
 A janela da aplicacao permite:
